@@ -1,9 +1,17 @@
 import { type NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
-import { prisma } from "@/lib/prisma"
 
-export const authOptions: NextAuthOptions = {
+// Lazy-load prisma to avoid build-time initialization
+function getPrisma() {
+  // Dynamic import to defer evaluation until runtime
+  const { prisma } = require("@/lib/prisma")
+  return prisma
+}
+
+// Export as a function to defer evaluation until runtime
+export function getAuthOptions(): NextAuthOptions {
+  return {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -16,14 +24,11 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // Only use Prisma at runtime, not during build
-        if (!prisma) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
-        })
+        try {
+          const prisma = getPrisma()
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email }
+          })
 
         if (!user) {
           return null
@@ -38,11 +43,15 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          isAdmin: user.isAdmin,
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            isAdmin: user.isAdmin,
+          }
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
         }
       }
     })
@@ -70,7 +79,11 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET || "your-secret-key-change-in-production",
+  }
 }
+
+// For backward compatibility, export as constant that calls the function
+export const authOptions = getAuthOptions()
 
 // Type augmentation for NextAuth
 declare module "next-auth" {

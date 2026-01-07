@@ -4,24 +4,41 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-const getPrismaClient = () => {
-  // Skip Prisma initialization during build if DATABASE_URL is not set
-  // This prevents build-time errors on Vercel
-  if (typeof window === 'undefined' && !process.env.DATABASE_URL) {
-    // Only skip during build phase, not runtime
-    if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-production-compile') {
-      // Return a minimal mock during build
-      return null as any
-    }
+// Lazy initialization function - only creates client when actually needed
+function getPrismaClient(): PrismaClient {
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma
   }
 
-  return new PrismaClient({
+  // Check if we're in a build environment
+  const isBuildPhase = 
+    process.env.NEXT_PHASE === 'phase-production-build' ||
+    process.env.NEXT_PHASE === 'phase-production-compile' ||
+    !process.env.DATABASE_URL
+
+  // During build, create a client without validating connection
+  const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // Disable connection validation during build
+    datasources: isBuildPhase ? undefined : undefined,
   })
+
+  if (!isBuildPhase || process.env.NODE_ENV !== 'production') {
+    globalForPrisma.prisma = client
+  }
+
+  return client
 }
 
-export const prisma = globalForPrisma.prisma ?? getPrismaClient()
-
-if (process.env.NODE_ENV !== 'production' && prisma) {
-  globalForPrisma.prisma = prisma
-}
+// Export a getter that lazy-loads the client
+// This prevents initialization during module evaluation
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient()
+    const value = (client as any)[prop]
+    if (typeof value === 'function') {
+      return value.bind(client)
+    }
+    return value
+  }
+})
