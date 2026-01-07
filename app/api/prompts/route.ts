@@ -1,14 +1,29 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getTodayUTC, isSameCalendarDay, parseDateString, isFutureDate, formatDateString } from "@/lib/date-utils"
+import { getTodayUTC, isSameCalendarDay, parseDateString, isFutureDate, formatDateString, parseLocalDateString, isSameLocalCalendarDay } from "@/lib/date-utils"
 
-// GET - Get today's prompt ONLY
+// GET - Get today's prompt ONLY (based on client's timezone)
 export async function GET(request: Request) {
   try {
-    // Get today's date based on server time (UTC)
-    // This ensures we use the server's date, not the client's machine date
-    const today = getTodayUTC()
+    // Get client's local date from query parameter
+    // Format: YYYY-MM-DD (e.g., "2026-01-07")
+    const { searchParams } = new URL(request.url)
+    const clientDateStr = searchParams.get("date")
+    
+    let today: Date
+    if (clientDateStr) {
+      // Use client's provided date (their local calendar day)
+      today = parseLocalDateString(clientDateStr)
+    } else {
+      // Fallback to server UTC if no date provided (for backward compatibility)
+      today = getTodayUTC()
+    }
+    
+    // Extract today's calendar day components once
+    const todayYear = today.getUTCFullYear()
+    const todayMonth = today.getUTCMonth()
+    const todayDay = today.getUTCDate()
     
     // Get all prompts
     const allPrompts = await prisma.prompt.findMany({
@@ -18,18 +33,20 @@ export async function GET(request: Request) {
     })
 
     // Find the prompt that matches today's calendar date EXACTLY
-    // IMPORTANT: Only match today's date, NEVER return future prompts
+    // Compare using local calendar day (year, month, day)
+    // Prompts in DB are stored as UTC dates, but we compare calendar days
     let matchingPrompt = null
     for (const p of allPrompts) {
       const promptDate = new Date(p.promptDate)
       
-      // NEVER return future prompts - skip immediately
-      if (isFutureDate(promptDate)) {
-        continue
-      }
+      // Get the calendar day components from the prompt (stored as UTC but represents a calendar day)
+      // Compare against today's calendar day
+      const promptYear = promptDate.getUTCFullYear()
+      const promptMonth = promptDate.getUTCMonth()
+      const promptDay = promptDate.getUTCDate()
       
-      // Check if it's an exact calendar date match (year, month, day)
-      if (isSameCalendarDay(promptDate, today)) {
+      // Match if same calendar day (year, month, day)
+      if (promptYear === todayYear && promptMonth === todayMonth && promptDay === todayDay) {
         matchingPrompt = p
         break // Found today's prompt, stop searching
       }
@@ -44,8 +61,11 @@ export async function GET(request: Request) {
 
     // Final validation: verify it's actually today's prompt (safety check)
     const finalPromptDate = new Date(matchingPrompt.promptDate)
+    const finalYear = finalPromptDate.getUTCFullYear()
+    const finalMonth = finalPromptDate.getUTCMonth()
+    const finalDay = finalPromptDate.getUTCDate()
     
-    if (!isSameCalendarDay(finalPromptDate, today) || isFutureDate(finalPromptDate)) {
+    if (finalYear !== todayYear || finalMonth !== todayMonth || finalDay !== todayDay) {
       // This should never happen, but safety check
       return NextResponse.json(
         { error: "No prompt available for today" },

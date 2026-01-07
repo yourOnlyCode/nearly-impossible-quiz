@@ -62,43 +62,36 @@ export default function QuizPage() {
 
   const fetchPrompt = async () => {
     try {
-      const response = await fetch("/api/prompts")
+      // Get client's local date (YYYY-MM-DD format)
+      const now = new Date()
+      const clientYear = now.getFullYear()
+      const clientMonth = String(now.getMonth() + 1).padStart(2, '0')
+      const clientDay = String(now.getDate()).padStart(2, '0')
+      const clientDateStr = `${clientYear}-${clientMonth}-${clientDay}`
+      
+      // Send client's local date to API
+      const response = await fetch(`/api/prompts?date=${clientDateStr}`)
       if (response.ok) {
         const data = await response.json()
         
-        // Verify the prompt date matches today (double-check on client side)
-        // Get today's date from server by requesting it
-        const todayResponse = await fetch("/api/date-today")
-        let isValidPrompt = true
+        // Verify the prompt date matches today (client-side validation)
+        // The prompt date comes as UTC but represents a calendar day
+        // Convert it to a UTC date and extract the calendar day components
+        const promptDate = new Date(data.promptDate)
+        const promptYear = promptDate.getUTCFullYear()
+        const promptMonth = promptDate.getUTCMonth()
+        const promptDay = promptDate.getUTCDate()
         
-        if (todayResponse.ok) {
-          const todayData = await todayResponse.json()
-          const promptDate = new Date(data.promptDate)
-          const todayDate = new Date(todayData.today)
-          
-          // Compare year, month, day only
-          const promptYear = promptDate.getUTCFullYear()
-          const promptMonth = promptDate.getUTCMonth()
-          const promptDay = promptDate.getUTCDate()
-          
-          const todayYear = todayDate.getUTCFullYear()
-          const todayMonth = todayDate.getUTCMonth()
-          const todayDay = todayDate.getUTCDate()
-          
-          // If dates don't match exactly, don't show the prompt
-          if (promptYear !== todayYear || promptMonth !== todayMonth || promptDay !== todayDay) {
-            console.error(`Prompt date ${promptYear}-${promptMonth + 1}-${promptDay} does not match today ${todayYear}-${todayMonth + 1}-${todayDay}`)
-            isValidPrompt = false
-            setMessage("No prompt available for today. Check back tomorrow!")
-            setPrompt(null)
-            return
-          }
+        // Compare calendar days: prompt (from UTC date) vs client local date
+        if (promptYear !== clientYear || promptMonth !== (now.getMonth()) || promptDay !== now.getDate()) {
+          console.error(`Prompt date ${promptYear}-${promptMonth + 1}-${promptDay} does not match client today ${clientYear}-${now.getMonth() + 1}-${now.getDate()}`)
+          setMessage("No prompt available for today. Check back tomorrow!")
+          setPrompt(null)
+          return
         }
         
-        if (isValidPrompt) {
-          setPrompt(data)
-          loadLocalData(data.id)
-        }
+        setPrompt(data)
+        loadLocalData(data.id)
       } else {
         setMessage("No prompt available for today. Check back tomorrow!")
       }
@@ -247,12 +240,22 @@ export default function QuizPage() {
               Today's Challenge
             </CardTitle>
             <CardDescription className="text-white/70">
-              {new Date(prompt.promptDate).toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {(() => {
+                // Extract calendar day from prompt date (stored as UTC but represents a calendar day)
+                const promptDate = new Date(prompt.promptDate)
+                const year = promptDate.getUTCFullYear()
+                const month = promptDate.getUTCMonth()
+                const day = promptDate.getUTCDate()
+                
+                // Create a date in local timezone for display (but using the calendar day from UTC)
+                const displayDate = new Date(year, month, day)
+                return displayDate.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              })()}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

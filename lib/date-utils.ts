@@ -76,3 +76,49 @@ export function parseDateString(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
 }
+
+/**
+ * Normalize a date to the start of the day in the client's local timezone
+ * This extracts year, month, day from local time and creates a UTC date at start of that day
+ */
+export function normalizeDateToLocalDayStart(date: Date): Date {
+  // Get the local year, month, day
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  const day = date.getDate()
+  
+  // Create a UTC date at the start of that calendar day
+  // This represents "January 7th" in the client's timezone, stored as UTC
+  return new Date(Date.UTC(year, month, day, 0, 0, 0, 0))
+}
+
+/**
+ * Get a date's calendar day components (year, month, day) in local timezone
+ */
+export function getLocalCalendarDay(date: Date): { year: number; month: number; day: number } {
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth(),
+    day: date.getDate(),
+  }
+}
+
+/**
+ * Check if two dates are on the same calendar day using local timezone
+ */
+export function isSameLocalCalendarDay(date1: Date, date2: Date): boolean {
+  const day1 = getLocalCalendarDay(date1)
+  const day2 = getLocalCalendarDay(date2)
+  
+  return day1.year === day2.year && day1.month === day2.month && day1.day === day2.day
+}
+
+/**
+ * Parse a YYYY-MM-DD string representing a client's local date
+ * This creates a UTC date at the start of that calendar day
+ */
+export function parseLocalDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  // Create UTC date representing this calendar day
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+}
