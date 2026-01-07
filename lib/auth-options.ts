@@ -16,6 +16,11 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Only use Prisma at runtime, not during build
+        if (!prisma) {
+          return null
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })

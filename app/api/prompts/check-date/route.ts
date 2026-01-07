@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const allPrompts = await prisma.prompt.findMany()
 
     // Check if any prompt matches this exact calendar date
-    const exists = allPrompts.some(p => {
+    const exists = allPrompts.some((p: { promptDate: Date | string }) => {
       const promptDate = new Date(p.promptDate)
       return isSameCalendarDay(promptDate, checkDate)
     })

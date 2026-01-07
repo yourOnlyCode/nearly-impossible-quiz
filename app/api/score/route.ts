@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     })
 
     // Find if there's a correct guess
-    const correctGuess = guesses.find(g => g.isCorrect)
+    const correctGuess = guesses.find((g: { isCorrect: boolean }) => g.isCorrect)
     const isCorrect = !!correctGuess
 
     // Score is the number of guesses (higher = worse)
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       score,
       isCorrect,
-      guesses: guesses.map(g => g.guessText),
+      guesses: guesses.map((g: { guessText: string }) => g.guessText),
     })
   } catch (error) {
     console.error("Error fetching score:", error)

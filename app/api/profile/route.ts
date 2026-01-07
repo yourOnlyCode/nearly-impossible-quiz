@@ -35,7 +35,7 @@ export async function GET() {
     // Calculate scores per prompt
     const promptScores: Record<string, { prompt: any; score: number; isCorrect: boolean }> = {}
 
-    guesses.forEach(guess => {
+    guesses.forEach((guess: any) => {
       const promptId = guess.promptId
       if (!promptScores[promptId]) {
         promptScores[promptId] = {
