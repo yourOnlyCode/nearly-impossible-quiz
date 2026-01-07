@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String // hashed password
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  guesses   Guess[]
+
+  @@map("users")
+}
+
+model Prompt {
+  id         String   @id @default(cuid())
+  content    String   // The prompt/question text
+  solution   String   // The correct answer
+  promptDate DateTime @unique // The date this prompt should be shown
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  guesses    Guess[]
+
+  @@map("prompts")
+}
+
+model Guess {
+  id         String   @id @default(cuid())
+  userId     String
+  promptId   String
+  guessText  String   // The user's guess
+  isCorrect  Boolean  // Whether the guess was correct
+  guessOrder Int      // The order of this guess (1st, 2nd, 3rd, etc.) for scoring
+  createdAt  DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promptId, guessOrder])
+  @@map("guesses")
+}
